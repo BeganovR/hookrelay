@@ -1,9 +1,9 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"hookrelay/internal/handler"
+	"hookrelay/internal/storage"
 	"log/slog"
 	"net/http"
 	"os"
@@ -12,27 +12,31 @@ import (
 
 const version = "1.0.0"
 
-type config struct {
-	port int
-}
-
 func main() {
-	var conf config
-	flag.IntVar(&conf.port, "port", 8080, "Server port")
-	flag.Parse()
+	// Logger settings
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
+	// Database pool
+	dbPool, err := storage.ConnectDB(os.Getenv("DATABASE_URL"))
+	if err != nil {
+		slog.Error("Unable to connect to Database", "Error", err)
+		os.Exit(1)
+	}
+	defer dbPool.Close()
+
+	// Server settings
 	router := initializeRoutes()
 	server := &http.Server{
-		Addr:              fmt.Sprintf("localhost:%d", conf.port), //TODO: delete "localhost"
+		Addr:              fmt.Sprintf("localhost:%s", os.Getenv("PORT")), //TODO: delete "localhost"
 		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 		WriteTimeout:      15 * time.Second,
 	}
-	err := server.ListenAndServe()
+	err = server.ListenAndServe()
 	if err != nil {
-		logger.Error("server failed to start", "error", err)
+		logger.Error("Server failed to start", "error", err)
+		os.Exit(1)
 	}
 }
 

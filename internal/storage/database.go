@@ -1,1 +1,20 @@
 package storage
+
+import (
+	"context"
+	"log/slog"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+func ConnectDB(dbURL string) (*pgxpool.Pool, error) {
+	pool, err := pgxpool.New(context.Background(), dbURL)
+	if err != nil {
+		return nil, err
+	}
+	if err := pool.Ping(context.Background()); err != nil {
+		return nil, err
+	}
+	slog.Info("Database connect successfully!")
+	return pool, nil
+}
