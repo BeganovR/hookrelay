@@ -1,41 +1,44 @@
 package main
 
 import (
+	"flag"
 	"fmt"
-	"io"
-	"log"
+	"hookrelay/internal/handler"
+	"log/slog"
 	"net/http"
+	"os"
+	"time"
 )
 
-func receiverHandler(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1024*1024) // 1 MB is limit for 1 webhook
-	defer r.Body.Close()
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		fmt.Printf("Error: reading body. Desc: %v\n", err)
-		http.Error(w, fmt.Sprintf("Error: reading body. Desc: %v\n", err), http.StatusBadRequest)
-		return
-	}
-	hookId := r.PathValue("id")
+const version = "1.0.0"
 
-	fmt.Printf("receiverHandler: ID пользователя и Body получены, ID: %v,\nBody: %s\n", hookId, body)
-	w.WriteHeader(http.StatusAccepted)
-	w.Write([]byte("Webhook received\n"))
+type config struct {
+	port int
 }
 
 func main() {
+	var conf config
+	flag.IntVar(&conf.port, "port", 8080, "Server port")
+	flag.Parse()
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
 	router := initializeRoutes()
-
-	server := http.Server{}
-
-	err := http.ListenAndServe("localhost:8080", router) //TODO: do ":8080", delete "localhost"
+	server := &http.Server{
+		Addr:              fmt.Sprintf("localhost:%d", conf.port), //TODO: delete "localhost"
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      15 * time.Second,
+	}
+	err := server.ListenAndServe()
 	if err != nil {
-		log.Fatalf("Error: %v\n", err)
+		logger.Error("server failed to start", "error", err)
 	}
 }
 
 func initializeRoutes() *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /v1/ingest/{id}", receiverHandler)
+	mux.HandleFunc("POST /v1/ingest/{id}", handler.ReceiverHandler)
+	//mux.HandleFunc("GET /v1/healthcheck", handler.HealthHandler) //TODO: uncomment, do healthcheck for DB, version and port
 	return mux
 }
