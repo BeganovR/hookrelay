@@ -19,8 +19,8 @@ type Application struct {
 }
 
 func Load() (*Config, error) {
-	_ = godotenv.Load() // on local, you put yours environment on .env file
-	// on server, you don't have a .env file. Scan on system environment
+	_ = godotenv.Load() // locally, load environment variables from a .env file
+	// on the server, read configuration from system environment variables
 
 	var config Config
 	if err := env.Parse(&config); err != nil {
