@@ -22,14 +22,14 @@ func main() {
 	// Config
 	cfg, err := config.Load()
 	if err != nil {
-		slog.Error("Unable to load config. See you .env file or system environment", "Error", err)
+		slog.Error("Unable to load config. See your .env file or system environment", "error", err)
 		os.Exit(1)
 	}
 
 	// Database pool
 	dbPool, err := storage.ConnectDB(cfg.DB.PostgresURL)
 	if err != nil {
-		slog.Error("Unable to connect to Database", "Error", err)
+		slog.Error("Unable to connect to Database", "error", err)
 		os.Exit(1)
 	}
 	defer dbPool.Close()
