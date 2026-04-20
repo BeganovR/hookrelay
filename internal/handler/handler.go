@@ -31,5 +31,7 @@ func (h *WebhookHandler) ReceiverHandler(w http.ResponseWriter, r *http.Request)
 
 	slog.Info("ID and Body are received", "ID", hookId, "Body", string(body))
 	w.WriteHeader(http.StatusAccepted)
-	w.Write([]byte("Webhook received\n"))
+	if _, err = w.Write([]byte("Webhook received\n")); err != nil {
+		slog.Error("writing response failed", "error", err)
+	}
 }
