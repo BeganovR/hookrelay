@@ -29,3 +29,10 @@ func NewStorage(dbPool *pgxpool.Pool) *Storage {
 		Pool: dbPool,
 	}
 }
+
+func (s *Storage) SaveWebhook(id string, body []byte) error {
+	//TODO: Here we are do a SQL request to save webhook
+
+	slog.Info("Webhook saved to database")
+	return nil
+}
