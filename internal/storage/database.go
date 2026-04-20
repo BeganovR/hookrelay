@@ -16,7 +16,7 @@ func ConnectDB(dbURL string) (*pgxpool.Pool, error) {
 		pool.Close()
 		return nil, err
 	}
-	slog.Info("Database connect successfully!")
+	slog.Info("Database connected successfully")
 	return pool, nil
 }
 
