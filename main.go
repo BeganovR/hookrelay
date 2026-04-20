@@ -1,9 +1,11 @@
 package main
 
 import (
-	"flag"
 	"fmt"
+	"hookrelay/internal/config"
 	"hookrelay/internal/handler"
+	"hookrelay/internal/service"
+	"hookrelay/internal/storage"
 	"log/slog"
 	"net/http"
 	"os"
@@ -12,33 +14,49 @@ import (
 
 const version = "1.0.0"
 
-type config struct {
-	port int
-}
-
 func main() {
-	var conf config
-	flag.IntVar(&conf.port, "port", 8080, "Server port")
-	flag.Parse()
+	// Logger settings
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
-	router := initializeRoutes()
+	// Config
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("Unable to load config. See you .env file or system environment", "Error", err)
+		os.Exit(1)
+	}
+
+	// Database pool
+	dbPool, err := storage.ConnectDB(cfg.DB.PostgresURL)
+	if err != nil {
+		slog.Error("Unable to connect to Database", "Error", err)
+		os.Exit(1)
+	}
+	defer dbPool.Close()
+
+	// Structs
+	myStorage := storage.NewStorage(dbPool)
+	myService := service.NewWebhookService(myStorage)
+	myHandler := handler.NewWebhookHandler(myService)
+
+	// Server settings
+	router := initializeRoutes(myHandler)
 	server := &http.Server{
-		Addr:              fmt.Sprintf("localhost:%d", conf.port), //TODO: delete "localhost"
+		Addr:              fmt.Sprintf("localhost:%s", cfg.App.Port), //TODO: delete "localhost"
 		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 		WriteTimeout:      15 * time.Second,
 	}
-	err := server.ListenAndServe()
+	err = server.ListenAndServe()
 	if err != nil {
-		logger.Error("server failed to start", "error", err)
+		logger.Error("Server failed to start", "error", err)
+		os.Exit(1)
 	}
 }
 
-func initializeRoutes() *http.ServeMux {
+func initializeRoutes(h *handler.WebhookHandler) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /v1/ingest/{id}", handler.ReceiverHandler)
+	mux.HandleFunc("POST /v1/ingest/{id}", h.ReceiverHandler)
 	//mux.HandleFunc("GET /v1/healthcheck", handler.HealthHandler) //TODO: uncomment, do healthcheck for DB, version and port
 	return mux
 }
