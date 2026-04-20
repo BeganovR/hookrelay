@@ -13,6 +13,7 @@ func ConnectDB(dbURL string) (*pgxpool.Pool, error) {
 		return nil, err
 	}
 	if err := pool.Ping(context.Background()); err != nil {
+		pool.Close()
 		return nil, err
 	}
 	slog.Info("Database connect successfully!")
