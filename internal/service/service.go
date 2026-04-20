@@ -1,13 +1,20 @@
 package service
 
-import "hookrelay/internal/storage"
-
-type WebhookService struct {
-	repo *storage.Storage
+type WebhookRepository interface {
+	SaveWebhook(id string, body []byte) error
 }
 
-func NewWebhookService(newRepo *storage.Storage) *WebhookService {
+type WebhookService struct {
+	repo WebhookRepository
+}
+
+func NewWebhookService(newRepo WebhookRepository) *WebhookService {
 	return &WebhookService{
 		repo: newRepo,
 	}
+}
+
+func (s *WebhookService) ProcessWebhook(id string, body []byte) error {
+	//TODO: Implement Business-logic (null-check, etc)
+	return s.repo.SaveWebhook(id, body)
 }
