@@ -13,8 +13,19 @@ func ConnectDB(dbURL string) (*pgxpool.Pool, error) {
 		return nil, err
 	}
 	if err := pool.Ping(context.Background()); err != nil {
+		pool.Close()
 		return nil, err
 	}
-	slog.Info("Database connect successfully!")
+	slog.Info("Database connected successfully")
 	return pool, nil
+}
+
+type Storage struct {
+	Pool *pgxpool.Pool
+}
+
+func NewStorage(dbPool *pgxpool.Pool) *Storage {
+	return &Storage{
+		Pool: dbPool,
+	}
 }

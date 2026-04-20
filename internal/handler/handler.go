@@ -2,12 +2,23 @@ package handler
 
 import (
 	"fmt"
+	"hookrelay/internal/service"
 	"io"
 	"log/slog"
 	"net/http"
 )
 
-func ReceiverHandler(w http.ResponseWriter, r *http.Request) {
+type WebhookHandler struct {
+	srv *service.WebhookService
+}
+
+func NewWebhookHandler(newSrv *service.WebhookService) *WebhookHandler {
+	return &WebhookHandler{
+		srv: newSrv,
+	}
+}
+
+func (h *WebhookHandler) ReceiverHandler(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1024*1024) // 1 MB is limit for 1 webhook
 	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)
