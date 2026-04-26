@@ -34,6 +34,13 @@ func main() {
 	}
 	defer dbPool.Close()
 
+	// Migrations
+	err = storage.RunMigrations(cfg.DB.PostgresURL)
+	if err != nil {
+		slog.Error("Unable to apply migrations", "error", err)
+		os.Exit(1)
+	}
+
 	// Structs
 	myStorage := storage.NewStorage(dbPool)
 	myService := service.NewWebhookService(myStorage)
