@@ -2,12 +2,13 @@ package storage
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"log/slog"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -36,7 +37,7 @@ func NewStorage(dbPool *pgxpool.Pool) *Storage {
 }
 
 func (s *Storage) SaveWebhook(id string, body []byte) error {
-	query := `INSERT INTO webhooks (id, client_id, body) VALUES ($1, $2, $3)`
+	query := `INSERT INTO webhooks (id, client_id, body) VALUES ($1, $2, $3::jsonb)`
 	newID := uuid.New()
 	_, err := s.Pool.Exec(context.Background(), query, newID, id, body)
 	if err != nil {
@@ -46,14 +47,23 @@ func (s *Storage) SaveWebhook(id string, body []byte) error {
 	return nil
 }
 
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
+
 func RunMigrations(dbURL string) error {
-	m, err := migrate.New(
-		"file://cmd/migrations",
+	sourceDriver, err := iofs.New(migrationsFS, "migrations")
+	if err != nil {
+		return err
+	}
+	m, err := migrate.NewWithSourceInstance(
+		"iofs",
+		sourceDriver,
 		dbURL,
 	)
 	if err != nil {
 		return err
 	}
+	defer m.Close()
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return err
 	}
