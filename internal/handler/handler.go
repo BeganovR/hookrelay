@@ -28,7 +28,6 @@ func (h *WebhookHandler) ReceiverHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	hookId := r.PathValue("id")
-
 	slog.Info("ID and Body are received", "ID", hookId, "Body", string(body))
 
 	err = h.srv.ProcessWebhook(hookId, body)
@@ -37,7 +36,6 @@ func (h *WebhookHandler) ReceiverHandler(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Error: webhook processing failed\n", http.StatusInternalServerError)
 		return
 	}
-
 	w.WriteHeader(http.StatusAccepted)
 	if _, err = w.Write([]byte("Webhook received\n")); err != nil {
 		slog.Error("writing response failed", "error", err)
