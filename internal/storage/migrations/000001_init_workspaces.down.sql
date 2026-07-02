@@ -1,0 +1,6 @@
+BEGIN;
+
+DROP TABLE IF EXISTS api_keys;
+DROP TABLE IF EXISTS workspaces;
+
+COMMIT;

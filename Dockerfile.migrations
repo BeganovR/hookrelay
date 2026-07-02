@@ -1,0 +1,19 @@
+FROM golang:1.24-alpine
+
+RUN apk add --no-cache bash curl postgresql-client git
+
+RUN curl -L https://github.com/golang-migrate/migrate/releases/download/v4.17.1/migrate.linux-amd64.tar.gz \
+    | tar xvz && mv migrate /usr/local/bin/migrate
+
+RUN go install github.com/realkarych/seqwall@latest
+
+WORKDIR /app
+
+COPY migrations ./migrations
+COPY seeds ./seeds
+COPY scripts ./scripts
+COPY entrypoint.sh ./entrypoint.sh
+
+RUN chmod +x ./scripts/ci-up-one.sh ./scripts/ci-down-one.sh ./entrypoint.sh
+
+ENTRYPOINT ["./entrypoint.sh"]

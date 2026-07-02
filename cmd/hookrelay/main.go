@@ -1,69 +1,100 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"hookrelay/internal/config"
 	"hookrelay/internal/handler"
 	"hookrelay/internal/service"
 	"hookrelay/internal/storage"
-	"log/slog"
-	"net/http"
-	"os"
-	"time"
 )
 
-const version = "1.0.0"
+const version = "0.1.0"
 
 func main() {
-	// Logger settings
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	slog.SetDefault(logger)
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})))
 
-	// Config
 	cfg, err := config.Load()
 	if err != nil {
-		slog.Error("Unable to load config. See your .env file or system environment", "error", err)
+		slog.Error("config load failed", "error", err)
 		os.Exit(1)
 	}
 
-	// Database pool
-	dbPool, err := storage.ConnectDB(cfg.DB.PostgresURL)
+	pool, err := connectWithRetry(cfg.DB.PostgresURL, 5, 2*time.Second)
 	if err != nil {
-		slog.Error("Unable to connect to Database", "error", err)
+		slog.Error("database connect failed", "error", err)
 		os.Exit(1)
 	}
-	defer dbPool.Close()
+	defer pool.Close()
 
-	// Migrations
-	err = storage.RunMigrations(cfg.DB.PostgresURL)
-	if err != nil {
-		slog.Error("Unable to apply migrations", "error", err)
+	if err := storage.RunMigrations(cfg.DB.PostgresURL); err != nil {
+		slog.Error("migrations failed", "error", err)
 		os.Exit(1)
 	}
 
-	// Structs
-	myStorage := storage.NewStorage(dbPool)
-	myService := service.NewWebhookService(myStorage)
-	myHandler := handler.NewWebhookHandler(myService)
+	db := storage.New(pool)
+	ingestSvc := service.NewIngestService(db)
+	worker := service.NewWorker(db, cfg.Worker)
 
-	// Server settings
-	router := initializeRoutes(myHandler)
-	server := &http.Server{
-		Addr:              fmt.Sprintf("localhost:%s", cfg.App.Port), //TODO: delete "localhost"
-		Handler:           router,
+	srv := &http.Server{
+		Addr:              fmt.Sprintf(":%s", cfg.App.Port),
+		Handler:           handler.SetupRoutes(db, ingestSvc, cfg.App.BaseURL, cfg.App.IngestRatePerSec, cfg.App.IngestRateBurst, cfg.Worker.StuckTimeout),
 		ReadHeaderTimeout: 5 * time.Second,
-		WriteTimeout:      15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
-	err = server.ListenAndServe()
-	if err != nil {
-		logger.Error("Server failed to start", "error", err)
-		os.Exit(1)
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	go worker.Run(workerCtx)
+
+	go func() {
+		slog.Info("server started", "addr", srv.Addr, "version", version)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("server error", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	<-ctx.Done()
+	slog.Info("shutting down gracefully")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		slog.Error("http shutdown failed", "error", err)
 	}
+
+	workerCancel()
+
+	slog.Info("server stopped")
 }
 
-func initializeRoutes(h *handler.WebhookHandler) *http.ServeMux {
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /v1/ingest/{id}", h.ReceiverHandler)
-	//mux.HandleFunc("GET /v1/healthcheck", handler.HealthHandler) //TODO: uncomment, do healthcheck for DB, version and port
-	return mux
+func connectWithRetry(dbURL string, attempts int, delay time.Duration) (*pgxpool.Pool, error) {
+	var pool *pgxpool.Pool
+	var err error
+	for i := 1; i <= attempts; i++ {
+		pool, err = storage.Connect(dbURL)
+		if err == nil {
+			return pool, nil
+		}
+		if i < attempts {
+			slog.Warn("database connect attempt failed, retrying", "attempt", i, "error", err)
+			time.Sleep(delay)
+		}
+	}
+	return nil, err
 }

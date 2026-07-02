@@ -1,0 +1,5 @@
+BEGIN;
+
+ALTER TABLE sources DROP COLUMN IF EXISTS name;
+
+COMMIT;

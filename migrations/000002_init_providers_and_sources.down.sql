@@ -1,0 +1,6 @@
+BEGIN;
+
+DROP TABLE IF EXISTS sources;
+DROP TABLE IF EXISTS providers;
+
+COMMIT;

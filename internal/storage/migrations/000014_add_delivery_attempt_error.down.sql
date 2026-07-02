@@ -1,0 +1,5 @@
+BEGIN;
+
+ALTER TABLE delivery_attempts DROP COLUMN IF EXISTS error;
+
+COMMIT;

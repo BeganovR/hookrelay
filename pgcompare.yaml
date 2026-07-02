@@ -1,0 +1,54 @@
+migration:
+  env_var: MIGRATION_VERSION
+  before_version: "6"
+  after_version: "8"
+
+database:
+  host: localhost
+  port: 5432
+  name: hookrelay
+  user: hookrelay_user
+  password: supersecretpassword
+
+setup:
+  command: "./pgcompare_setup.sh"
+
+benchmark:
+  before_queries: queries_before.sql
+  after_queries: queries_after.sql
+  warmup_iterations: 5
+  iterations: 200
+  concurrency: 4
+  repeats: 3
+
+report:
+  description:
+    - query: events_last_hour
+      what: Фильтрация событий по времени получения без индекса на received_at
+      changes: CREATE INDEX idx_events_received_at ON events(received_at DESC)
+      expected: Index Scan вместо Seq Scan — планировщик читает только нужный диапазон вместо всей таблицы
+
+    - query: pending_deliveries
+      what: Выборка ожидающих доставок по подписке без индексов на deliveries
+      changes: "CREATE INDEX idx_deliveries_subscription_id ON deliveries(subscription_id); CREATE INDEX idx_deliveries_pending_retry ON deliveries(next_retry_at) WHERE status = 'pending'"
+      expected: Устранение Seq Scan по deliveries при фильтрации по subscription_id и статусу
+
+    - query: delivery_success_rate
+      what: Агрегация результатов доставок по подпискам через JOIN без индекса
+      changes: CREATE INDEX idx_deliveries_subscription_id ON deliveries(subscription_id)
+      expected: Hash Join со Seq Scan заменяется на Nested Loop с Index Scan
+
+    - query: top_sources_by_volume
+      what: Агрегация событий по источникам за временной интервал без индекса на received_at
+      changes: CREATE INDEX idx_events_received_at ON events(received_at DESC)
+      expected: Index Scan по диапазону времени сужает выборку до GROUP BY
+
+    - query: workspace_audit_log
+      what: Аудит-лог воркспейса — покрывающий индекс и упрощение SELECT
+      changes: "CREATE INDEX idx_audit_workspace_created ON audit_logs(workspace_id, created_at DESC) INCLUDE (action, user_id); SELECT только покрытые колонки"
+      expected: Index-Only Scan исключает обращение к heap полностью
+
+    - query: subscription_attempt_history
+      what: История попыток доставки — многоуровневый JOIN без индексов на delivery_id и subscription_id
+      changes: "CREATE INDEX idx_deliveries_subscription_id ON deliveries(subscription_id); CREATE INDEX idx_delivery_attempts_delivery_id ON delivery_attempts(delivery_id)"
+      expected: Цепочка Seq Scan заменяется на Nested Loop Index Scan по каждому уровню JOIN

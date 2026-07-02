@@ -1,0 +1,205 @@
+// 1. Пользователи и Воркспейсы
+
+Table users {
+  id uuid [pk, default: `gen_random_uuid()`]
+  email varchar(255) [unique, not null]
+  password_hash varchar(255) [not null]
+  name varchar(100) [not null]
+  created_at timestamptz [default: `now()`, not null]
+}
+
+Table workspaces {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar(100) [not null]
+  description text
+  created_at timestamptz [default: `now()`, not null]
+}
+
+Table workspace_members {
+  workspace_id uuid [not null]
+  user_id uuid [not null]
+  role varchar(50) [not null, note: 'owner, admin, member']
+  joined_at timestamptz [default: `now()`, not null]
+
+  indexes {
+    (workspace_id, user_id) [pk]
+  }
+}
+
+Table api_keys {
+  id uuid [pk, default: `gen_random_uuid()`]
+  workspace_id uuid [not null]
+  name varchar(100) [not null]
+  token_hash varchar(255) [unique, not null]
+  is_active boolean [default: true, not null]
+  created_at timestamptz [default: `now()`, not null]
+}
+
+// 2. Прием вебхуков (Sources)
+
+Table providers {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar(100) [unique, not null, note: 'GitHub, Stripe, Telegram']
+  signature_algorithm varchar(50) [note: 'Как проверять подпись: hmac-sha256 и т.д.']
+}
+
+Table sources {
+  id uuid [pk, default: `gen_random_uuid()`]
+  workspace_id uuid [not null]
+  provider_id uuid [not null]
+  slug varchar(100) [unique, not null, note: 'Уникальная часть URL, например tg-bot-123']
+  signing_secret varchar(255) [note: 'Секрет от провайдера для проверки подписи']
+  is_active boolean [default: true, not null]
+  created_at timestamptz [default: `now()`, not null]
+}
+
+Table events {
+  id uuid [pk, default: `gen_random_uuid()`]
+  source_id uuid [not null]
+  idempotency_key varchar(255) [note: 'Уникальный ID вебхука от провайдера (защита от дублей)']
+  headers jsonb [not null, note: 'Сырые HTTP-заголовки']
+  payload jsonb [not null, note: 'Само тело запроса (JSON)']
+  payload_size int [not null, note: 'Размер в байтах']
+  sender_ip inet [not null]
+  received_at timestamptz [default: `now()`, not null]
+
+  indexes {
+    (source_id, idempotency_key) [unique]
+  }
+}
+
+// 3. Маршрутизация (Subscriptions)
+
+Table event_types {
+  id uuid [pk, default: `gen_random_uuid()`]
+  provider_id uuid [not null]
+  name varchar(100) [not null, note: 'Например: push, pull_request']
+  description text
+}
+
+Table subscriptions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  source_id uuid [not null]
+  target_url varchar(2000) [not null, note: 'Куда пересылать (URL сервера юзера)']
+  secret varchar(255) [note: 'Секрет для подписи исходящих запросов']
+  created_at timestamptz [default: `now()`, not null]
+}
+
+Table subscription_event_filters {
+  subscription_id uuid [not null]
+  event_type_id uuid [not null]
+
+  indexes {
+    (subscription_id, event_type_id) [pk]
+  }
+}
+
+// 4. Доставка и ретраи
+
+Table retry_policies {
+  subscription_id uuid [pk, not null]
+  max_attempts int [default: 5, not null]
+  initial_delay_ms int [default: 1000, not null]
+  multiplier numeric(4,2) [default: 2.0, not null, note: 'Множитель задержки']
+}
+
+Table deliveries {
+  id uuid [pk, default: `gen_random_uuid()`]
+  event_id uuid [not null]
+  subscription_id uuid [not null]
+  status varchar(50) [not null, note: 'pending, delivered, failed']
+  attempts_count int [default: 0, not null]
+  next_retry_at timestamptz
+}
+
+Table delivery_attempts {
+  id uuid [pk, default: `gen_random_uuid()`]
+  delivery_id uuid [not null]
+  attempt_number int [not null]
+  status varchar(50) [not null, note: 'success, fail, timeout']
+  http_code int [note: 'HTTP статус ответа, например 200 или 500']
+  response_body text [note: 'Тело ответа от сервера юзера']
+  response_time_ms int [not null, note: 'Сколько мс ждали ответ']
+  created_at timestamptz [default: `now()`, not null]
+}
+
+// 5. Аудит и статистика
+
+Table audit_logs {
+  id uuid [pk, default: `gen_random_uuid()`]
+  workspace_id uuid [not null]
+  user_id uuid [not null]
+  action varchar(100) [not null, note: 'Например: source.created']
+  ip_address inet
+  changes jsonb [note: 'Что конкретно изменилось (diff)']
+  created_at timestamptz [default: `now()`, not null]
+}
+
+Table source_hourly_stats {
+  id uuid [pk, default: `gen_random_uuid()`]
+  source_id uuid [not null]
+  hour_bucket timestamptz [not null, note: 'Время, округленное до часа']
+  events_count int [default: 0, not null]
+  success_count int [default: 0, not null]
+  failed_count int [default: 0, not null]
+
+  indexes {
+    (source_id, hour_bucket) [unique]
+  }
+}
+
+// 6. Оповещения об ошибках (Alerts)
+
+Table alert_rules {
+  id uuid [pk, default: `gen_random_uuid()`]
+  subscription_id uuid [not null]
+  rule_type varchar(50) [not null, note: 'Например: error_rate_high']
+  threshold numeric(10,2) [not null, note: 'Порог срабатывания, например 50.0 (50%)']
+  check_period_minutes int [not null, note: 'За какой период смотрим']
+  notification_channel varchar(255) [not null, note: 'Email или URL вебхука']
+}
+
+Table alerts {
+  id uuid [pk, default: `gen_random_uuid()`]
+  alert_rule_id uuid [not null]
+  triggered_value numeric(10,2) [not null, note: 'Фактическое значение при сбое']
+  message text [not null]
+  is_resolved boolean [default: false, not null]
+  created_at timestamptz [default: `now()`, not null]
+  resolved_at timestamptz
+}
+
+// Связи (Foreign Keys)
+
+// Воркспейсы и пользователи
+Ref: workspace_members.workspace_id > workspaces.id
+Ref: workspace_members.user_id > users.id
+Ref: api_keys.workspace_id > workspaces.id
+
+// Источники и провайдеры
+Ref: sources.workspace_id > workspaces.id
+Ref: sources.provider_id > providers.id
+Ref: event_types.provider_id > providers.id
+
+// События
+Ref: events.source_id > sources.id
+
+// Подписки
+Ref: subscriptions.source_id > sources.id
+Ref: subscription_event_filters.subscription_id > subscriptions.id
+Ref: subscription_event_filters.event_type_id > event_types.id
+Ref: retry_policies.subscription_id - subscriptions.id
+
+// Доставка
+Ref: deliveries.event_id > events.id
+Ref: deliveries.subscription_id > subscriptions.id
+Ref: delivery_attempts.delivery_id > deliveries.id
+
+// Аудит и стата
+Ref: audit_logs.workspace_id > workspaces.id
+Ref: audit_logs.user_id > users.id
+Ref: source_hourly_stats.source_id > sources.id
+
+// Алерты
+Ref: alert_rules.subscription_id > subscriptions.id
+Ref: alerts.alert_rule_id > alert_rules.id
