@@ -1,0 +1,21 @@
+FROM postgres:17-alpine
+
+RUN apk add --no-cache python3 py3-pip curl
+
+RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') \
+    && curl -sSL "https://dl.min.io/client/mc/release/linux-${ARCH}/mc" -o /usr/local/bin/mc \
+    && chmod +x /usr/local/bin/mc
+
+RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') \
+    && curl -sSL "https://github.com/aptible/supercronic/releases/download/v0.2.29/supercronic-linux-${ARCH}" -o /usr/local/bin/supercronic \
+    && chmod +x /usr/local/bin/supercronic
+
+RUN pip3 install --no-cache-dir --break-system-packages prometheus_client minio
+
+COPY backup/backup.sh /usr/local/bin/backup.sh
+COPY backup/exporter.py /usr/local/bin/exporter.py
+COPY backup/entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /usr/local/bin/backup.sh /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

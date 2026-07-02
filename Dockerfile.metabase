@@ -1,0 +1,6 @@
+FROM alpine:3.20 AS downloader
+RUN wget -qO /clickhouse.metabase-driver.jar \
+    "https://github.com/ClickHouse/metabase-clickhouse-driver/releases/download/1.50.7/clickhouse.metabase-driver.jar"
+
+FROM metabase/metabase:v0.50.29
+COPY --from=downloader /clickhouse.metabase-driver.jar /plugins/clickhouse.metabase-driver.jar

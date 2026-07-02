@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE events ALTER COLUMN sender_ip DROP DEFAULT;
+ALTER TABLE workspaces DROP COLUMN IF EXISTS updated_at;
+
+COMMIT;

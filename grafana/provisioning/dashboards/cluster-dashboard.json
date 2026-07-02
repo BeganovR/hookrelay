@@ -1,0 +1,329 @@
+{
+  "title": "Patroni Cluster",
+  "uid": "patroni-cluster",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-30m", "to": "now" },
+  "timezone": "browser",
+  "panels": [
+    {
+      "id": 1,
+      "title": "patroni1 — роль",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "patroni_is_leader{node=\"patroni1\"}",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "Replica", "color": "blue", "index": 0 },
+                "1": { "text": "Leader",  "color": "green", "index": 1 }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "patroni2 — роль",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "patroni_is_leader{node=\"patroni2\"}",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "Replica", "color": "blue",  "index": 0 },
+                "1": { "text": "Leader",  "color": "green", "index": 1 }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "patroni1 — доступность",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "patroni_node_running{node=\"patroni1\"}",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "DOWN", "color": "red",   "index": 0 },
+                "1": { "text": "UP",   "color": "green", "index": 1 }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "patroni2 — доступность",
+      "type": "stat",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "patroni_node_running{node=\"patroni2\"}",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "DOWN", "color": "red",   "index": 0 },
+                "1": { "text": "UP",   "color": "green", "index": 1 }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "DCS last seen (секунды с последнего контакта с etcd)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "patroni_dcs_last_seen_seconds{node=\"patroni1\"}",
+          "legendFormat": "patroni1",
+          "refId": "A"
+        },
+        {
+          "expr": "patroni_dcs_last_seen_seconds{node=\"patroni2\"}",
+          "legendFormat": "patroni2",
+          "refId": "B"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 20 },
+              { "color": "red",    "value": 35 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Replication lag (байты)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "patroni_replication_lag_bytes{node=\"patroni1\"}",
+          "legendFormat": "patroni1 (leader→replica)",
+          "refId": "A"
+        },
+        {
+          "expr": "patroni_replication_lag_bytes{node=\"patroni2\"}",
+          "legendFormat": "patroni2 (leader→replica)",
+          "refId": "B"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green",  "value": null },
+              { "color": "yellow", "value": 1048576 },
+              { "color": "red",    "value": 10485760 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "WAL Timeline",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "patroni_timeline{node=\"patroni1\"}",
+          "legendFormat": "patroni1",
+          "refId": "A"
+        },
+        {
+          "expr": "patroni_timeline{node=\"patroni2\"}",
+          "legendFormat": "patroni2",
+          "refId": "B"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "lineWidth": 2, "drawStyle": "line", "steppedLine": true }
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Узлы в роли leader (должно быть = 1)",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 12, "w": 6, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum(patroni_is_leader)",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "Нет лидера!", "color": "red",    "index": 0 },
+                "1": { "text": "1 лидер",     "color": "green",  "index": 1 },
+                "2": { "text": "Split-brain!", "color": "red",    "index": 2 }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Узлы online",
+      "type": "stat",
+      "gridPos": { "x": 18, "y": 12, "w": 6, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum(patroni_node_running)",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "Все упали",  "color": "red",    "index": 0 },
+                "1": { "text": "1/2 online", "color": "yellow", "index": 1 },
+                "2": { "text": "2/2 online", "color": "green",  "index": 2 }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        }
+      }
+    }
+  ]
+}

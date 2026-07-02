@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE subscriptions DROP COLUMN IF EXISTS endpoint_id;
+DROP TABLE IF EXISTS endpoints;
+
+COMMIT;

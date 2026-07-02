@@ -1,0 +1,5 @@
+BEGIN;
+
+ALTER TABLE delivery_attempts ADD COLUMN IF NOT EXISTS error TEXT;
+
+COMMIT;

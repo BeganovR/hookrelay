@@ -1,0 +1,7 @@
+BEGIN;
+
+ALTER TABLE sources DROP COLUMN IF EXISTS updated_at;
+ALTER TABLE sources DROP COLUMN IF EXISTS verifier_cfg;
+ALTER TABLE sources DROP COLUMN IF EXISTS verifier_type;
+
+COMMIT;

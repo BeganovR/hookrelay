@@ -1,0 +1,7 @@
+BEGIN;
+
+DROP TABLE IF EXISTS delivery_attempts;
+DROP TABLE IF EXISTS deliveries;
+DROP TABLE IF EXISTS subscriptions;
+
+COMMIT;

@@ -1,0 +1,19 @@
+FROM postgres:17
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-pip \
+    gettext-base \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --no-cache-dir --break-system-packages \
+    "patroni[etcd3]" \
+    psycopg2-binary
+
+COPY patroni.yml /etc/patroni/patroni.yml.template
+COPY patroni_entrypoint.sh /patroni_entrypoint.sh
+COPY patroni_post_init.sh /etc/patroni/post_init.sh
+
+RUN chmod +x /patroni_entrypoint.sh /etc/patroni/post_init.sh
+
+ENTRYPOINT ["/patroni_entrypoint.sh"]
